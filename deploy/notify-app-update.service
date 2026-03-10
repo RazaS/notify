@@ -1,0 +1,12 @@
+[Unit]
+Description=Update notify app from GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/notify-app.env
+ExecStart=/opt/notify-app/current/deploy/update_notify.sh
+WorkingDirectory=/opt/notify-app/current
+User=root
+Group=root

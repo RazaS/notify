@@ -1,0 +1,16 @@
+[Unit]
+Description=Notify Flask app
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/notify-app/current
+EnvironmentFile=/etc/notify-app.env
+ExecStart=/opt/notify-app/venv/bin/gunicorn --workers 1 --bind 127.0.0.1:8327 --timeout 60 wsgi:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

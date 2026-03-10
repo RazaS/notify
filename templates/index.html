@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Notify{% endblock %}
+
+{% block body %}
+<main class="app-shell">
+    <section class="panel hero-panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Notify</div>
+                <h1>Schedule a Telegram reminder</h1>
+                <p class="lede">Queue a message for later delivery, then let the app archive it after send.</p>
+            </div>
+            <div class="panel-header-actions">
+                <button class="button button-ghost" type="button" data-theme-toggle>Toggle theme</button>
+                <form method="post" action="{{ url_for('logout') }}">
+                    <button class="button button-ghost" type="submit">Log out</button>
+                </form>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-stack">
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% if not telegram_ready %}
+        <div class="flash-stack">
+            <div class="flash flash-error">Telegram delivery is not configured yet. Set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code>.</div>
+        </div>
+        {% endif %}
+
+        <form class="reminder-form" method="post" action="{{ url_for('create_reminder') }}">
+            <label class="field message-field">
+                <span>Message</span>
+                <textarea
+                    name="message"
+                    rows="3"
+                    maxlength="500"
+                    placeholder="Buy printer ink, call the dentist, send the contract..."
+                    required
+                ></textarea>
+            </label>
+            <label class="field time-field">
+                <span>Time</span>
+                <input type="datetime-local" name="scheduled_for" min="{{ min_scheduled }}" required>
+            </label>
+            <div class="form-actions">
+                <button class="button button-primary" type="submit">Submit</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel queue-panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Queue</div>
+                <h2>{{ queued|length }} scheduled</h2>
+                <p class="muted">These reminders are pending and can still be deleted.</p>
+            </div>
+        </div>
+        <div class="queue-scroll">
+            {% if queued %}
+                {% for reminder in queued %}
+                <article class="reminder-card">
+                    <div class="reminder-meta">
+                        <span class="status-pill">Queued</span>
+                        <span class="muted">{{ reminder.scheduled_label }}</span>
+                    </div>
+                    <p class="reminder-message">{{ reminder.message }}</p>
+                    {% if reminder.last_error %}
+                    <p class="tiny-note error-note">Last Telegram error: {{ reminder.last_error }}</p>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('delete_reminder', reminder_id=reminder.id) }}">
+                        <button class="button button-danger" type="submit">Delete</button>
+                    </form>
+                </article>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <h3>No reminders queued</h3>
+                    <p>Add a message and a time above.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="panel archive-panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Archive</div>
+                <h2>{{ archived|length }} recent sends</h2>
+                <p class="muted">Delivered reminders land here automatically.</p>
+            </div>
+        </div>
+        <div class="archive-scroll">
+            {% if archived %}
+                {% for reminder in archived %}
+                <article class="archive-card">
+                    <div class="reminder-meta">
+                        <span class="status-pill status-pill-archived">Archived</span>
+                        <span class="muted">Sent {{ reminder.sent_label }}</span>
+                    </div>
+                    <p class="reminder-message">{{ reminder.message }}</p>
+                    <p class="tiny-note">Originally scheduled for {{ reminder.scheduled_label }}</p>
+                </article>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <h3>No archived reminders yet</h3>
+                    <p>Delivered messages will show up here.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</main>
+{% endblock %}

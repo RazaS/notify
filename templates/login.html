@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Notify Login{% endblock %}
+
+{% block body %}
+<main class="login-shell">
+    <section class="login-card">
+        <div class="eyebrow">Notify</div>
+        <h1>Private reminder queue</h1>
+        <p class="lede">Sign in with the app credentials to schedule Telegram reminders.</p>
+        {% if error_message %}
+        <div class="flash flash-error">{{ error_message }}</div>
+        {% endif %}
+        <form class="login-form" method="post" action="{{ url_for('login') }}">
+            <label class="field">
+                <span>Username</span>
+                <input type="text" name="username" value="raza" autocomplete="username" required>
+            </label>
+            <label class="field">
+                <span>Password</span>
+                <input type="password" name="password" autocomplete="current-password" required>
+            </label>
+            <button class="button button-primary button-block" type="submit">Log in</button>
+        </form>
+    </section>
+</main>
+{% endblock %}

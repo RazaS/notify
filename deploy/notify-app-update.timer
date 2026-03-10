@@ -1,0 +1,10 @@
+[Unit]
+Description=Run notify app auto-update every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=notify-app-update.service
+
+[Install]
+WantedBy=timers.target
