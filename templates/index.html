@@ -118,8 +118,8 @@
         <div class="panel-header">
             <div>
                 <div class="eyebrow">Archive</div>
-                <h2>{{ archived|length }} recent sends</h2>
-                <p class="muted">Delivered reminders land here automatically.</p>
+                <h2>{{ archived_total }} recent sends</h2>
+                <p class="muted">Showing {{ archived|length }} at a time. Delivered reminders land here automatically.</p>
             </div>
         </div>
         <div class="archive-scroll">
@@ -141,6 +141,14 @@
                 </div>
             {% endif %}
         </div>
+        {% if archive_can_expand %}
+        <div class="archive-actions">
+            <form method="get" action="{{ url_for('index') }}">
+                <input type="hidden" name="archive_limit" value="{{ archive_next_limit }}">
+                <button class="button button-ghost" type="submit">Show {{ archive_more_count }} more</button>
+            </form>
+        </div>
+        {% endif %}
     </section>
 </main>
 {% endblock %}

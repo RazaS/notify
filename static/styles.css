@@ -230,6 +230,7 @@ code {
 .field {
     display: grid;
     gap: 0.42rem;
+    min-width: 0;
 }
 
 .field span {
@@ -243,6 +244,7 @@ code {
 input,
 select,
 textarea {
+    min-width: 0;
     width: 100%;
     border: 1px solid var(--line);
     border-radius: 18px;
@@ -270,12 +272,14 @@ textarea:focus {
     grid-template-columns: minmax(140px, 1fr) minmax(0, 1.2fr);
     gap: 0.75rem;
     align-items: end;
+    min-width: 0;
 }
 
 .time-picker-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.55rem;
+    min-width: 0;
 }
 
 .button {
@@ -339,6 +343,10 @@ textarea:focus {
     gap: 0.8rem;
 }
 
+.archive-actions {
+    padding: 0 1rem 1rem;
+}
+
 .reminder-meta {
     display: flex;
     justify-content: space-between;
@@ -396,6 +404,12 @@ textarea:focus {
 
     .schedule-row {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .date-field,
+    .time-field,
+    .schedule-field {
+        min-width: 0;
     }
 }
 

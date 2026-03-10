@@ -157,6 +157,49 @@ class NotifyAppTestCase(unittest.TestCase):
         self.assertIn(b'name="scheduled_minute"', response.data)
         self.assertIn(b'name="scheduled_period"', response.data)
 
+    def test_archive_defaults_to_three_and_expands_by_ten(self) -> None:
+        self.login()
+
+        with self.app.app_context():
+            conn = get_db()
+            for index in range(15):
+                conn.execute(
+                    """
+                    INSERT INTO reminders (
+                        message,
+                        scheduled_for_utc,
+                        timezone,
+                        status,
+                        created_at_utc,
+                        sent_at_utc,
+                        archived_at_utc
+                    )
+                    VALUES (?, ?, ?, 'archived', ?, ?, ?)
+                    """,
+                    (
+                        f"Archive {index:02d}",
+                        f"2000-01-{index + 1:02d}T15:00:00+00:00",
+                        "America/Toronto",
+                        f"2000-01-{index + 1:02d}T14:00:00+00:00",
+                        f"2000-01-{index + 1:02d}T16:00:00+00:00",
+                        f"2000-01-{index + 1:02d}T16:00:00+00:00",
+                    ),
+                )
+            conn.commit()
+
+        response = self.client.get("/")
+        self.assertIn(b"Archive 14", response.data)
+        self.assertIn(b"Archive 13", response.data)
+        self.assertIn(b"Archive 12", response.data)
+        self.assertNotIn(b"Archive 11", response.data)
+        self.assertIn(b"Show 10 more", response.data)
+
+        expanded_response = self.client.get("/?archive_limit=13")
+        self.assertIn(b"Archive 11", expanded_response.data)
+        self.assertIn(b"Archive 02", expanded_response.data)
+        self.assertNotIn(b"Archive 01", expanded_response.data)
+        self.assertIn(b"Show 2 more", expanded_response.data)
+
 
 if __name__ == "__main__":
     unittest.main()

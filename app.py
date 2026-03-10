@@ -208,6 +208,15 @@ def load_reminders(status: str, limit: int | None = None) -> list[dict]:
     return reminders
 
 
+def count_reminders(status: str) -> int:
+    db = get_db()
+    row = db.execute(
+        "SELECT COUNT(*) AS reminder_count FROM reminders WHERE status = ?",
+        (status,),
+    ).fetchone()
+    return int(row["reminder_count"])
+
+
 def login_required(view):
     @wraps(view)
     def wrapped_view(*args, **kwargs):
@@ -357,12 +366,20 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def index():
         queued = load_reminders("queued")
-        archived = load_reminders("archived", limit=50)
+        archive_limit = request.args.get("archive_limit", default=3, type=int) or 3
+        archive_limit = max(3, min(archive_limit, 200))
+        archived_total = count_reminders("archived")
+        archived = load_reminders("archived", limit=archive_limit)
         now_local = datetime.now(ZoneInfo(app.config["APP_TIMEZONE"]))
         return render_template(
             "index.html",
             queued=queued,
             archived=archived,
+            archived_total=archived_total,
+            archive_limit=archive_limit,
+            archive_can_expand=archived_total > archive_limit,
+            archive_more_count=min(10, max(0, archived_total - archive_limit)),
+            archive_next_limit=min(archived_total, archive_limit + 10),
             **build_schedule_defaults(now_local),
         )
 
