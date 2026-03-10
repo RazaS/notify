@@ -58,7 +58,8 @@ body {
 body,
 button,
 input,
-textarea {
+textarea,
+select {
     font: inherit;
 }
 
@@ -216,7 +217,7 @@ code {
     grid-column: 1;
 }
 
-.time-field {
+.schedule-field {
     grid-column: 2;
 }
 
@@ -240,6 +241,7 @@ code {
 }
 
 input,
+select,
 textarea {
     width: 100%;
     border: 1px solid var(--line);
@@ -257,9 +259,23 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.schedule-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) minmax(0, 1.2fr);
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.time-picker-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
 }
 
 .button {
@@ -373,9 +389,13 @@ textarea:focus {
     }
 
     .message-field,
-    .time-field,
+    .schedule-field,
     .form-actions {
         grid-column: 1;
+    }
+
+    .schedule-row {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

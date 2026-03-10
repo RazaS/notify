@@ -5,7 +5,7 @@ import json
 import os
 import sqlite3
 import threading
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from functools import wraps
 from pathlib import Path
 from secrets import compare_digest
@@ -67,6 +67,53 @@ def format_local(utc_value: str | None, tz_name: str) -> str:
 def build_telegram_message(reminder: sqlite3.Row) -> str:
     scheduled = format_local(reminder["scheduled_for_utc"], reminder["timezone"])
     return f"Reminder: {reminder['message']}\nWhen: {scheduled}"
+
+
+def build_schedule_defaults(now_local: datetime) -> dict:
+    hour_24 = now_local.hour
+    minute_value = now_local.minute
+    period = "AM" if hour_24 < 12 else "PM"
+    hour_12 = hour_24 % 12 or 12
+    return {
+        "default_date": now_local.strftime("%Y-%m-%d"),
+        "default_hour": f"{hour_12:02d}",
+        "default_minute": f"{minute_value:02d}",
+        "default_period": period,
+        "hour_options": [f"{value:02d}" for value in range(1, 13)],
+        "minute_options": [f"{value:02d}" for value in range(60)],
+        "period_options": ["AM", "PM"],
+    }
+
+
+def parse_scheduled_fields(
+    scheduled_date_raw: str,
+    scheduled_hour_raw: str,
+    scheduled_minute_raw: str,
+    scheduled_period_raw: str,
+    timezone_name: str,
+) -> datetime:
+    scheduled_date = date.fromisoformat(scheduled_date_raw)
+    hour_12 = int(scheduled_hour_raw)
+    minute_value = int(scheduled_minute_raw)
+    period = scheduled_period_raw.upper()
+
+    if hour_12 < 1 or hour_12 > 12:
+        raise ValueError("Invalid hour.")
+    if minute_value < 0 or minute_value > 59:
+        raise ValueError("Invalid minute.")
+    if period not in {"AM", "PM"}:
+        raise ValueError("Invalid period.")
+
+    hour_24 = hour_12 % 12
+    if period == "PM":
+        hour_24 += 12
+
+    local_time = time(hour=hour_24, minute=minute_value)
+    return datetime.combine(
+        scheduled_date,
+        local_time,
+        tzinfo=ZoneInfo(timezone_name),
+    )
 
 
 class TelegramSender:
@@ -312,27 +359,41 @@ def create_app(test_config: dict | None = None) -> Flask:
         queued = load_reminders("queued")
         archived = load_reminders("archived", limit=50)
         now_local = datetime.now(ZoneInfo(app.config["APP_TIMEZONE"]))
-        min_scheduled = (now_local + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")
         return render_template(
             "index.html",
             queued=queued,
             archived=archived,
-            min_scheduled=min_scheduled,
+            **build_schedule_defaults(now_local),
         )
 
     @app.post("/reminders")
     @login_required
     def create_reminder():
         message = request.form.get("message", "").strip()
-        scheduled_for_raw = request.form.get("scheduled_for", "").strip()
+        scheduled_date_raw = request.form.get("scheduled_date", "").strip()
+        scheduled_hour_raw = request.form.get("scheduled_hour", "").strip()
+        scheduled_minute_raw = request.form.get("scheduled_minute", "").strip()
+        scheduled_period_raw = request.form.get("scheduled_period", "").strip()
         timezone_name = app.config["APP_TIMEZONE"]
 
-        if not message or not scheduled_for_raw:
+        if (
+            not message
+            or not scheduled_date_raw
+            or not scheduled_hour_raw
+            or not scheduled_minute_raw
+            or not scheduled_period_raw
+        ):
             flash("Message and time are required.", "error")
             return redirect(url_for("index"))
 
         try:
-            local_dt = datetime.fromisoformat(scheduled_for_raw)
+            local_dt = parse_scheduled_fields(
+                scheduled_date_raw,
+                scheduled_hour_raw,
+                scheduled_minute_raw,
+                scheduled_period_raw,
+                timezone_name,
+            )
         except ValueError:
             flash("Use a valid date and time.", "error")
             return redirect(url_for("index"))
@@ -341,8 +402,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash("Keep reminders under 500 characters.", "error")
             return redirect(url_for("index"))
 
-        local_dt = local_dt.replace(tzinfo=ZoneInfo(timezone_name))
-        if local_dt <= datetime.now(ZoneInfo(timezone_name)):
+        now_local = datetime.now(ZoneInfo(timezone_name)).replace(second=0, microsecond=0)
+        if local_dt < now_local:
             flash("Pick a time in the future.", "error")
             return redirect(url_for("index"))
 

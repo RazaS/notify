@@ -66,7 +66,10 @@ class NotifyAppTestCase(unittest.TestCase):
             "/reminders",
             data={
                 "message": "Pay the phone bill",
-                "scheduled_for": "2030-05-02T18:45",
+                "scheduled_date": "2030-05-02",
+                "scheduled_hour": "06",
+                "scheduled_minute": "45",
+                "scheduled_period": "PM",
             },
             follow_redirects=True,
         )
@@ -145,6 +148,14 @@ class NotifyAppTestCase(unittest.TestCase):
             row = conn.execute("SELECT status, last_error FROM reminders").fetchone()
             self.assertEqual(row["status"], "queued")
             self.assertEqual(row["last_error"], "boom")
+
+    def test_dashboard_shows_separate_date_and_time_fields(self) -> None:
+        self.login()
+        response = self.client.get("/")
+        self.assertIn(b'name="scheduled_date"', response.data)
+        self.assertIn(b'name="scheduled_hour"', response.data)
+        self.assertIn(b'name="scheduled_minute"', response.data)
+        self.assertIn(b'name="scheduled_period"', response.data)
 
 
 if __name__ == "__main__":
