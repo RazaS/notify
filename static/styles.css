@@ -233,6 +233,10 @@ code {
     min-width: 0;
 }
 
+.date-field {
+    overflow: hidden;
+}
+
 .field span {
     color: var(--muted);
     font-size: 0.79rem;
@@ -410,6 +414,10 @@ textarea:focus {
     .time-field,
     .schedule-field {
         min-width: 0;
+    }
+
+    .date-field input {
+        font-size: 16px;
     }
 }
 

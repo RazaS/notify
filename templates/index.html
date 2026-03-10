@@ -50,7 +50,16 @@
                 <div class="schedule-row">
                     <label class="field date-field">
                         <span>Date</span>
-                        <input type="date" name="scheduled_date" value="{{ default_date }}" required>
+                        <input
+                            type="text"
+                            name="scheduled_date"
+                            value="{{ default_date }}"
+                            inputmode="numeric"
+                            placeholder="YYYY-MM-DD"
+                            pattern="\d{4}-\d{2}-\d{2}"
+                            maxlength="10"
+                            required
+                        >
                     </label>
                     <div class="field time-field">
                         <span>Time</span>
