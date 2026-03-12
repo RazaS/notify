@@ -67,9 +67,7 @@ class NotifyAppTestCase(unittest.TestCase):
             data={
                 "message": "Pay the phone bill",
                 "scheduled_date": "2030-05-02",
-                "scheduled_hour": "06",
-                "scheduled_minute": "45",
-                "scheduled_period": "PM",
+                "scheduled_time": "18:45",
             },
             follow_redirects=True,
         )
@@ -149,13 +147,12 @@ class NotifyAppTestCase(unittest.TestCase):
             self.assertEqual(row["status"], "queued")
             self.assertEqual(row["last_error"], "boom")
 
-    def test_dashboard_shows_separate_date_and_time_fields(self) -> None:
+    def test_dashboard_shows_date_and_single_time_field(self) -> None:
         self.login()
         response = self.client.get("/")
         self.assertIn(b'name="scheduled_date"', response.data)
-        self.assertIn(b'name="scheduled_hour"', response.data)
-        self.assertIn(b'name="scheduled_minute"', response.data)
-        self.assertIn(b'name="scheduled_period"', response.data)
+        self.assertIn(b'name="scheduled_time"', response.data)
+        self.assertIn(b'pattern="([01][0-9]|2[0-3]):[0-5][0-9]"', response.data)
 
     def test_archive_defaults_to_three_and_expands_by_ten(self) -> None:
         self.login()

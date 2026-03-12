@@ -63,23 +63,18 @@
                     </label>
                     <div class="field time-field">
                         <span>Time</span>
-                        <div class="time-picker-row">
-                            <select name="scheduled_hour" aria-label="Hour" required>
-                                {% for hour in hour_options %}
-                                <option value="{{ hour }}" {% if hour == default_hour %}selected{% endif %}>{{ hour }}</option>
-                                {% endfor %}
-                            </select>
-                            <select name="scheduled_minute" aria-label="Minute" required>
-                                {% for minute in minute_options %}
-                                <option value="{{ minute }}" {% if minute == default_minute %}selected{% endif %}>{{ minute }}</option>
-                                {% endfor %}
-                            </select>
-                            <select name="scheduled_period" aria-label="AM or PM" required>
-                                {% for period in period_options %}
-                                <option value="{{ period }}" {% if period == default_period %}selected{% endif %}>{{ period }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
+                        <input
+                            class="time-input"
+                            type="text"
+                            name="scheduled_time"
+                            value="{{ default_time }}"
+                            inputmode="numeric"
+                            placeholder="14:30"
+                            pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                            maxlength="5"
+                            title="Use HH:MM in 24-hour format"
+                            required
+                        >
                     </div>
                 </div>
             </div>

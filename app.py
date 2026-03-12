@@ -3,9 +3,10 @@ from __future__ import annotations
 import atexit
 import json
 import os
+import re
 import sqlite3
 import threading
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime
 from functools import wraps
 from pathlib import Path
 from secrets import compare_digest
@@ -44,6 +45,8 @@ CREATE INDEX IF NOT EXISTS idx_reminders_status_scheduled
 ON reminders(status, scheduled_for_utc);
 """
 
+TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -70,45 +73,22 @@ def build_telegram_message(reminder: sqlite3.Row) -> str:
 
 
 def build_schedule_defaults(now_local: datetime) -> dict:
-    hour_24 = now_local.hour
-    minute_value = now_local.minute
-    period = "AM" if hour_24 < 12 else "PM"
-    hour_12 = hour_24 % 12 or 12
     return {
         "default_date": now_local.strftime("%Y-%m-%d"),
-        "default_hour": f"{hour_12:02d}",
-        "default_minute": f"{minute_value:02d}",
-        "default_period": period,
-        "hour_options": [f"{value:02d}" for value in range(1, 13)],
-        "minute_options": [f"{value:02d}" for value in range(60)],
-        "period_options": ["AM", "PM"],
+        "default_time": now_local.strftime("%H:%M"),
     }
 
 
 def parse_scheduled_fields(
     scheduled_date_raw: str,
-    scheduled_hour_raw: str,
-    scheduled_minute_raw: str,
-    scheduled_period_raw: str,
+    scheduled_time_raw: str,
     timezone_name: str,
 ) -> datetime:
     scheduled_date = date.fromisoformat(scheduled_date_raw)
-    hour_12 = int(scheduled_hour_raw)
-    minute_value = int(scheduled_minute_raw)
-    period = scheduled_period_raw.upper()
+    if not TIME_PATTERN.fullmatch(scheduled_time_raw):
+        raise ValueError("Invalid time.")
 
-    if hour_12 < 1 or hour_12 > 12:
-        raise ValueError("Invalid hour.")
-    if minute_value < 0 or minute_value > 59:
-        raise ValueError("Invalid minute.")
-    if period not in {"AM", "PM"}:
-        raise ValueError("Invalid period.")
-
-    hour_24 = hour_12 % 12
-    if period == "PM":
-        hour_24 += 12
-
-    local_time = time(hour=hour_24, minute=minute_value)
+    local_time = datetime.strptime(scheduled_time_raw, "%H:%M").time()
     return datetime.combine(
         scheduled_date,
         local_time,
@@ -388,27 +368,17 @@ def create_app(test_config: dict | None = None) -> Flask:
     def create_reminder():
         message = request.form.get("message", "").strip()
         scheduled_date_raw = request.form.get("scheduled_date", "").strip()
-        scheduled_hour_raw = request.form.get("scheduled_hour", "").strip()
-        scheduled_minute_raw = request.form.get("scheduled_minute", "").strip()
-        scheduled_period_raw = request.form.get("scheduled_period", "").strip()
+        scheduled_time_raw = request.form.get("scheduled_time", "").strip()
         timezone_name = app.config["APP_TIMEZONE"]
 
-        if (
-            not message
-            or not scheduled_date_raw
-            or not scheduled_hour_raw
-            or not scheduled_minute_raw
-            or not scheduled_period_raw
-        ):
+        if not message or not scheduled_date_raw or not scheduled_time_raw:
             flash("Message and time are required.", "error")
             return redirect(url_for("index"))
 
         try:
             local_dt = parse_scheduled_fields(
                 scheduled_date_raw,
-                scheduled_hour_raw,
-                scheduled_minute_raw,
-                scheduled_period_raw,
+                scheduled_time_raw,
                 timezone_name,
             )
         except ValueError:
