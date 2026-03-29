@@ -266,6 +266,7 @@ def process_due_reminders(app: Flask) -> int:
         return 0
 
     processed_count = 0
+    did_change = False
     try:
         with sqlite3.connect(app.config["DATABASE"]) as connection:
             connection.row_factory = sqlite3.Row
@@ -289,6 +290,7 @@ def process_due_reminders(app: Flask) -> int:
                         "UPDATE reminders SET last_error = ? WHERE id = ?",
                         (str(exc), row["id"]),
                     )
+                    did_change = True
                     continue
 
                 sent_at = to_storage(utc_now())
@@ -305,9 +307,11 @@ def process_due_reminders(app: Flask) -> int:
                     (sent_at, sent_at, json.dumps(response), row["id"]),
                 )
                 processed_count += 1
+                did_change = True
 
             connection.commit()
-            sync_brief_csv(connection, app.config["BRIEF_CSV_PATH"])
+            if did_change:
+                sync_brief_csv(connection, app.config["BRIEF_CSV_PATH"])
     finally:
         lock.release()
 
