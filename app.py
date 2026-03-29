@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import csv
 import json
 import os
 import re
@@ -46,6 +47,18 @@ ON reminders(status, scheduled_for_utc);
 """
 
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+BRIEF_COLUMNS = [
+    "id",
+    "message",
+    "status",
+    "timezone",
+    "scheduled_for_local",
+    "scheduled_for_utc",
+    "created_at_utc",
+    "sent_at_utc",
+    "archived_at_utc",
+    "last_error",
+]
 
 
 def utc_now() -> datetime:
@@ -197,6 +210,46 @@ def count_reminders(status: str) -> int:
     return int(row["reminder_count"])
 
 
+def sync_brief_csv(connection: sqlite3.Connection, brief_csv_path: str) -> None:
+    csv_path = Path(brief_csv_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = csv_path.with_name(f"{csv_path.name}.tmp")
+    rows = connection.execute(
+        """
+        SELECT id, message, status, timezone, scheduled_for_utc, created_at_utc,
+               sent_at_utc, archived_at_utc, last_error
+        FROM reminders
+        ORDER BY scheduled_for_utc ASC, id ASC
+        """
+    ).fetchall()
+
+    with temp_path.open("w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=BRIEF_COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    "id": row["id"],
+                    "message": row["message"],
+                    "status": row["status"],
+                    "timezone": row["timezone"],
+                    "scheduled_for_local": format_local(row["scheduled_for_utc"], row["timezone"]),
+                    "scheduled_for_utc": row["scheduled_for_utc"],
+                    "created_at_utc": row["created_at_utc"],
+                    "sent_at_utc": row["sent_at_utc"] or "",
+                    "archived_at_utc": row["archived_at_utc"] or "",
+                    "last_error": row["last_error"] or "",
+                }
+            )
+    temp_path.replace(csv_path)
+
+
+def sync_brief_csv_from_path(database_path: str, brief_csv_path: str) -> None:
+    with sqlite3.connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        sync_brief_csv(connection, brief_csv_path)
+
+
 def login_required(view):
     @wraps(view)
     def wrapped_view(*args, **kwargs):
@@ -254,6 +307,7 @@ def process_due_reminders(app: Flask) -> int:
                 processed_count += 1
 
             connection.commit()
+            sync_brief_csv(connection, app.config["BRIEF_CSV_PATH"])
     finally:
         lock.release()
 
@@ -297,8 +351,15 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
+    app.config["BRIEF_CSV_PATH"] = (
+        app.config.get("BRIEF_CSV_PATH")
+        or os.environ.get("NOTIFY_BRIEF_PATH")
+        or str(Path(app.config["DATABASE"]).with_name("notify_brief.csv"))
+    )
+
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
     init_db(app.config["DATABASE"])
+    sync_brief_csv_from_path(app.config["DATABASE"], app.config["BRIEF_CSV_PATH"])
 
     app.extensions["notify_sender"] = TelegramSender(
         app.config["TELEGRAM_BOT_TOKEN"],
@@ -408,6 +469,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             ),
         )
         db.commit()
+        sync_brief_csv(db, app.config["BRIEF_CSV_PATH"])
         flash("Reminder queued.", "success")
         return redirect(url_for("index"))
 
@@ -420,6 +482,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             (reminder_id,),
         )
         db.commit()
+        sync_brief_csv(db, app.config["BRIEF_CSV_PATH"])
         if result.rowcount:
             flash("Reminder deleted.", "success")
         else:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import os
 import tempfile
 import unittest
@@ -25,10 +26,12 @@ class NotifyAppTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         database_path = os.path.join(self.temp_dir.name, "notify-test.db")
+        self.brief_csv_path = os.path.join(self.temp_dir.name, "notify_brief.csv")
         self.app = create_app(
             {
                 "TESTING": True,
                 "DATABASE": database_path,
+                "BRIEF_CSV_PATH": self.brief_csv_path,
                 "START_SCHEDULER": False,
                 "SECRET_KEY": "test-secret",
                 "LOGIN_USERNAME": "raza",
@@ -46,6 +49,10 @@ class NotifyAppTestCase(unittest.TestCase):
             data={"username": "raza", "password": "password"},
             follow_redirects=True,
         )
+
+    def read_brief_rows(self) -> list[dict[str, str]]:
+        with open(self.brief_csv_path, newline="", encoding="utf-8") as csv_file:
+            return list(csv.DictReader(csv_file))
 
     def test_login_required_redirects_root(self) -> None:
         response = self.client.get("/")
@@ -73,6 +80,11 @@ class NotifyAppTestCase(unittest.TestCase):
         )
         self.assertIn(b"Reminder queued.", response.data)
         self.assertIn(b"Pay the phone bill", response.data)
+        brief_rows = self.read_brief_rows()
+        self.assertEqual(len(brief_rows), 1)
+        self.assertEqual(brief_rows[0]["message"], "Pay the phone bill")
+        self.assertEqual(brief_rows[0]["status"], "queued")
+        self.assertEqual(brief_rows[0]["scheduled_for_utc"], "2030-05-02T22:45:00+00:00")
 
         with self.app.app_context():
             conn = get_db()
@@ -85,6 +97,7 @@ class NotifyAppTestCase(unittest.TestCase):
         )
         self.assertIn(b"Reminder deleted.", delete_response.data)
         self.assertNotIn(b"Pay the phone bill", delete_response.data)
+        self.assertEqual(self.read_brief_rows(), [])
 
     def test_due_reminder_gets_archived_after_send(self) -> None:
         fake_sender = FakeSender()
@@ -111,6 +124,10 @@ class NotifyAppTestCase(unittest.TestCase):
         self.assertEqual(processed, 1)
         self.assertEqual(len(fake_sender.messages), 1)
         self.assertIn("Book the trip", fake_sender.messages[0])
+        brief_rows = self.read_brief_rows()
+        self.assertEqual(len(brief_rows), 1)
+        self.assertEqual(brief_rows[0]["status"], "archived")
+        self.assertNotEqual(brief_rows[0]["sent_at_utc"], "")
 
         with self.app.app_context():
             conn = get_db()
@@ -140,6 +157,10 @@ class NotifyAppTestCase(unittest.TestCase):
 
         processed = process_due_reminders(self.app)
         self.assertEqual(processed, 0)
+        brief_rows = self.read_brief_rows()
+        self.assertEqual(len(brief_rows), 1)
+        self.assertEqual(brief_rows[0]["status"], "queued")
+        self.assertEqual(brief_rows[0]["last_error"], "boom")
 
         with self.app.app_context():
             conn = get_db()
